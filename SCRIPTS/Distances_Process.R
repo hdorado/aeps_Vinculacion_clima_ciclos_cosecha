@@ -16,9 +16,9 @@ source(here::here('SCRIPTS','Merge_Stations_Funs.R'))
 
 load(here::here('RESULTS','Catalogs.RData'))
 
-load(here::here('BASIC_FILES','list_Stations_Process.RData'))
-
 load(here::here('BASIC_FILES','list_Station_Unprocess.RData'))
+
+load(here::here('BASIC_FILES','list_Stations_Process.RData'))
 
 # Filter stations per availability
 
@@ -58,16 +58,19 @@ crop_cycle_vars_station_assignation <- assing_var_station(crop_cycles,usefullSta
 
 # Assigning daily weather information for each event variable
 
-Finald_weather_assign <- weather_assignation(crop_cycle_vars_station_assignation,list_Stations_Process)
+Final_weather_assign <- weather_assignation(crop_cycle_vars_station_assignation,list_Stations_Process)
 
 # Generating weather indicators
 
-Final_indicators <- weather_indicators(Finald_weather_assign)
+Final_indicators <- weather_indicators(Final_weather_assign)
 
 # Files to save
 
-save( Finald_weather_assign , file=here::here("RESULTS","Finalds_weather_assign.RData"))
+save( Final_weather_assign , file=here::here("RESULTS","Finalds_weather_assign.RData"))
+
+write.csv(crop_cycle_vars_station_assignation,here::here("RESULTS","crop_cycle_vars_station_assignation.csv"),row.names = F)
 
 write.csv(Final_indicators,here::here("RESULTS","Final_indicators.csv"),row.names = F)
+
 
 

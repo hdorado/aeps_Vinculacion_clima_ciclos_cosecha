@@ -128,10 +128,13 @@ $(document).ready(function () {
 
 <div id="introduccion" class="section level2">
 <h2>Introducción</h2>
-<p>La asignación de variables climáticas a ciclos de cosecha utilizando estaciones meteorológicas, se realiza por medio de un proceso que consiste inicialmente en definir la coincidencia entre sitios de cultivo y ubicación de la estaciones, dicha coincidencia se define por medio de diferencias entre altura y proximidad espacial, las cuales se evalúan por medio de restricciones que pueden variar por variable (por ejemplo la distancia aplicada para temperatura puede ser menos rigurosa que la distancia en precipitación). Un paso posterior a evaluar las coincidencias es el de calcular indicadores climáticos por cada una de las variables de interés dentro del ciclo, para lo cual se utilizan promedios, desviaciones estándar, acumulados y frecuencias.</p>
+<p>La asignación de variables climáticas a ciclos de cultivo utilizando estaciones meteorológicas, se realiza por medio de un proceso que consiste inicialmente en definir la coincidencia entre sitios de cultivo y ubicación de la estaciones, dicha coincidencia se define por medio de diferencias entre altura y proximidad espacial, las cuales se evalúan por medio de restricciones que pueden variar por variable (por ejemplo la distancia aplicada para temperatura puede ser menos rigurosa que la distancia en precipitación). Un paso posterior a evaluar las coincidencias es el de calcular indicadores climáticos por cada una de las variables de interés dentro del ciclo, para lo cual se utilizan promedios, desviaciones estándar, acumulados y frecuencias.</p>
+<p>El script <code>Distances_Process.R</code>, permite realizar el procesamiento de estaciones meteorológicas en escala diaria y ciclos de cultivo, con el propósito de vincularlos y generar indicadores climáticos que puedan ser de utilidad en el futuro para asociar información de suelo, manejo agronómico y rendimiento. Para que el proceso pueda ser ejecutado efectivamente se debe realizar una buena preparación de los datos utilizados, especialmente los de las estaciones meteorológicas.</p>
+<p>El documento se divide en una parte de preparación de datos donde se detalla la estructura de los archivos iniciales y los filtros de información relevante, seguido de la vinculación de ciclos de cultivo a estaciones meteorológicas que permite aplicar las restricciones de distancia y altura, luego una sesión para identificar por variable la estación más próxima a cada ciclo de cultivo, posteriormente se generan indicadores climáticos, y finalmente se almacenan los datos procesados. El propósito es que en el futuro, otros investigadores, técnicos, académicos entre otros puedan replicar estos pasos para analizar el efecto del clima en sitios cercanos a estaciones meteorológicas.</p>
 </div>
-<div id="preparacion-previa" class="section level2">
-<h2>Preparación previa</h2>
+<div id="preparacion-de-datos" class="section level2">
+<h2>Preparación de datos</h2>
+<p>Los paquetes necesarios, son <code>here</code> para leer y escribir archivos con la ubicación asignada para el proyecto, <code>data.table</code>, que es un paquete que permite manipular bases de datos de manera más eficiente, <code>plyr</code> que es un paquete de procesamiento y resumen de bases de datos, <code>Imap</code> que es una herramienta de mapeo interactivo y en este caso se usa para calcular las distancias entre puntos georeferenciados y <code>pgrimess</code> que es un paquete de análisis espacial y minería de datos</p>
 <pre class="r"><code>rm(list = ls())
 
 library(here)
@@ -139,14 +142,104 @@ library(data.table)
 library(plyr)
 library(Imap)
 library(pgirmess)</code></pre>
-<pre class="r"><code>source(here::here('SCRIPTS','Merge_Stations_Funs.R'))
-
-load(here::here('RESULTS','Catalogs.RData'))
-load(here::here('BASIC_FILES','list_Stations_Process.RData'))
-load(here::here('BASIC_FILES','list_Station_Unprocess.RData'))</code></pre>
+<div id="archivos-iniciales" class="section level3">
+<h3>Archivos iniciales</h3>
+<p>El primer archivo que debemos cargar por medio de la función <code>source</code> es <code>Merge_Station_Funs.R</code>, dado muchas de las funciones que utilizamos posteriormente están programadas allí, lo ideal es que esté de la carpeta <code>SCRIPTS</code></p>
+<pre class="r"><code>source(here::here('SCRIPTS','Merge_Stations_Funs.R'))</code></pre>
+<p>El siguiente archivo a cargar es el catálogo de estaciones climáticas, el cual debe contener a su vez una base de datos de ciclos de cultivo con la altura incluida, <code>Catalogs.RData</code> es un archivo que se genera en el proceso descrito en <a href="https://github.com/hdorado/aeps_Vinculacion_clima_ciclos_cosecha/blob/master/SCRIPTS/Stations_Catalog.R">Generación de catálogo de clima</a>, que está dentro de esta misma carpeta.</p>
+<pre class="r"><code>load(here::here('RESULTS','Catalogs.RData'))
+head(Stations_catalog)</code></pre>
+<pre><code>##        Station_Name Latitude Longitude Elevation P RH SR TM TX Ini_Date_P
+## 1   Chiapas5deMarzo 15.04469 -92.53328        10 1  1  0  1  1 2009-03-01
+## 2   ChiapasAgroipsa 17.58973 -91.94636        59 1  1  1  1  1 2013-09-03
+## 3 ChiapasAlpujarras 15.07486 -92.16931       998 0  1  1  1  1       &lt;NA&gt;
+## 4    ChiapasArgelia 14.83969 -92.50369         4 0  0  1  1  1       &lt;NA&gt;
+## 5    ChiapasArgovia 15.12858 -92.29531       712 1  0  0  1  1 2007-11-10
+## 6  ChiapasAustralia 16.25031 -92.46119       601 1  0  1  1  1 2008-07-01
+##   End_Date_P Ini_Date_RH End_Date_RH Ini_Date_TM End_Date_TM Ini_Date_TX
+## 1 2015-09-20  2009-03-01  2015-09-20  2009-03-01  2015-09-20  2009-03-01
+## 2 2017-12-13  2013-09-03  2017-12-13  2013-09-03  2017-12-13  2013-09-03
+## 3       &lt;NA&gt;  2011-04-18  2015-09-20  2011-04-18  2015-09-20  2011-04-18
+## 4       &lt;NA&gt;        &lt;NA&gt;        &lt;NA&gt;  2009-03-01  2015-09-20  2009-03-01
+## 5 2015-09-20        &lt;NA&gt;        &lt;NA&gt;  2007-11-10  2015-09-20  2007-11-10
+## 6 2013-03-05        &lt;NA&gt;        &lt;NA&gt;  2008-07-01  2013-03-05  2008-07-01
+##   End_Date_TX Ini_Date_SR End_Date_SR   Min_Date   Max_Date
+## 1  2015-09-20        &lt;NA&gt;        &lt;NA&gt; 2009-03-01 2015-09-20
+## 2  2017-12-13  2013-09-03  2017-12-13 2013-09-03 2017-12-13
+## 3  2015-09-20  2011-04-18  2015-09-20 2011-04-18 2015-09-20
+## 4  2015-09-20  2009-03-01  2015-09-20 2009-03-01 2015-09-20
+## 5  2015-09-20        &lt;NA&gt;        &lt;NA&gt; 2007-11-10 2015-09-20
+## 6  2013-03-05  2008-07-01  2013-03-05 2008-07-01 2013-03-05</code></pre>
+<pre class="r"><code>head(crop_cycles)</code></pre>
+<pre><code>##   FID Latitude Longitude Elevation   Ini_Date   End_Date
+## 1   0 15.16654 -92.81051         0 2009-03-01 2009-06-30
+## 2   1 15.16966 -92.79103        16 2013-09-03 2014-01-02
+## 3   2 15.36830 -92.78351        40 2011-04-18 2011-08-17
+## 4   3 15.18909 -92.77942        10 2009-03-01 2009-06-30
+## 5   4 15.27548 -92.62670       100 2007-11-10 2008-03-10
+## 6   5 15.22505 -92.87760        22 2008-07-01 2008-10-30</code></pre>
+<p><code>list_Station_Unprocess.RData</code> y <code>list_Stations_Process.RData</code> son archivos que provienen del proceso de <a href="https://github.com/j-river1/Weather_Data_Code">limpieza y control de procesamiento de datos</a>, <code>list_Station_Unprocess.RData</code> es una que lista contiene en cada componente un <code>data.frame</code> con fecha y medición de cada variable por separado, dicha medición está en un formato sin procesar, es decir puede contiener NA’s. El nombre de cada componente de la lista está compuesto por el identificador de la estación meterológica y separado por raya piso (<code>_</code>) el nombre de la variable, (<code>P</code>,<code>RH</code>,<code>SR</code>,<code>TM</code>,<code>TX</code>).</p>
+<pre class="r"><code>load(here::here('BASIC_FILES','list_Station_Unprocess.RData'))
+lapply(list_Stations_Unprocess[1:3],head)</code></pre>
+<pre><code>## $ChiapasYunnuenRanchoAlegre_TX
+##         Date var
+## 1 2006-01-01  NA
+## 2 2006-01-02  NA
+## 3 2006-01-03  NA
+## 4 2006-01-04  NA
+## 5 2006-01-05  NA
+## 6 2006-01-06  NA
+## 
+## $ChiapasYunnuenRanchoAlegre_TM
+##         Date var
+## 1 2006-01-01  NA
+## 2 2006-01-02  NA
+## 3 2006-01-03  NA
+## 4 2006-01-04  NA
+## 5 2006-01-05  NA
+## 6 2006-01-06  NA
+## 
+## $ChiapasYunnuenRanchoAlegre_SR
+##         Date    var
+## 1 2007-11-08 113.19
+## 2 2007-11-09 535.33
+## 3 2007-11-10 491.75
+## 4 2007-11-11 529.47
+## 5 2007-11-12 550.99
+## 6 2007-11-13 456.63</code></pre>
+<p>Por otro lado <code>list_Stations_Process.RData</code>, tiene los archivos ya procesados de las estaciones meteorológicas, siendo en este caso, listas que contienen <code>data.frames</code> con columnas de información limpias, y las variables trabajadas ya consolidadas en una tabla. El nombre corresponde con el identificador de la estación meteorológica.</p>
+<pre class="r"><code>load(here::here('BASIC_FILES','list_Stations_Process.RData'))
+lapply(list_Stations_Process[1:3],head)</code></pre>
+<pre><code>## $Chiapas5deMarzo
+##         Date P    RH     SR   TM   TX
+## 1 2009-03-01 1 78.81 406.05 17.1 32.2
+## 2 2009-03-02 0 59.62 565.66 16.2 33.9
+## 3 2009-03-03 0 68.06 557.36 15.5 33.1
+## 4 2009-03-04 0 68.93 552.14 15.8 32.2
+## 5 2009-03-05 0 57.01 547.86 15.0 33.7
+## 6 2009-03-06 0 65.85 548.87 14.5 34.5
+## 
+## $ChiapasAgroipsa
+##         Date    P    RH     SR       TM       TX
+## 1 2013-09-03  0.4 76.36 603.66 22.81849 32.97380
+## 2 2013-09-04  0.0 86.14 492.61 22.15026 34.05704
+## 3 2013-09-05 20.5 89.40 478.49 23.13098 33.98811
+## 4 2013-09-06  0.7 90.14 390.46 24.30158 34.77380
+## 5 2013-09-07  8.1 85.76 560.86 24.23131 35.02532
+## 6 2013-09-08 41.8 89.16 428.35 23.32564 34.31834
+## 
+## $ChiapasAlpujarras
+##         Date    P    RH     SR   TM   TX
+## 1 2011-04-18  1.2 88.41 221.49 19.7 27.2
+## 2 2011-04-19  3.4 89.77 231.87 18.3 24.1
+## 3 2011-04-20 52.2 91.05 287.99 17.5 25.3
+## 4 2011-04-21 93.8 90.66 274.39 17.8 24.3
+## 5 2011-04-22 43.4 92.78 194.94 15.9 23.5
+## 6 2011-04-23 57.2 75.46 480.77 17.5 25.9</code></pre>
 </div>
-<div id="estaciones-utiles-de-acuerdo-a-las-fechas-de-los-ciclos-de-siembra" class="section level2">
-<h2>Estaciones útiles de acuerdo a las fechas de los ciclos de siembra</h2>
+<div id="filtrar-por-informacion-util-de-acuerdo-a-los-periodos-de-interes-y-disponibilidad-de-datos" class="section level3">
+<h3>Filtrar por información útil de acuerdo a los periodos de interés y disponibilidad de datos</h3>
+<p>Descartar estaciones cuya información esté por fuera de las fechas de los ciclos de cultivo</p>
 <pre class="r"><code># Filter stations per availability
 
 earlist_date_crop_cycle &lt;- min(crop_cycles$Ini_Date)
@@ -157,15 +250,15 @@ rule1 &lt;- earlist_date_crop_cycle &gt; Stations_catalog$Max_Date
 rule2 &lt;- lastest_data_crop_cycle &lt; Stations_catalog$Min_Date
 
 Stations_target &lt;- Stations_catalog[!(rule1|rule2),]</code></pre>
-</div>
-<div id="ciclos-de-siembra-que-pueden-ser-vinculados-a-estaciones-por-sus-fechas-de-siembra" class="section level2">
-<h2>Ciclos de siembra que pueden ser vinculados a estaciones por sus fechas de siembra</h2>
+<p>Descartar ciclos de cultivo cuya información esté por fuera de las fechas de las estaciones</p>
 <pre class="r"><code># Filter station per cropping cycles
 
 crop_cycles &lt;- crop_cycles[min(Stations_target$Min_Date) &lt; crop_cycles$Ini_Date,]</code></pre>
 </div>
-<div id="vinculacion-de-ciclos-de-siembra" class="section level2">
-<h2>Vinculación de ciclos de siembra</h2>
+</div>
+<div id="vinculacion-de-ciclos-de-cultivo-a-estaciones-meteorologicas" class="section level2">
+<h2>Vinculación de ciclos de cultivo a estaciones meteorológicas</h2>
+<p>La función <code>merge_Stations</code> permite coincidir ciclos de cultivo y estaciones meteorológicas de acuerdo a restricciones de distancia conservando unicamente las relaciones que cumplan los criterios mínimos, en este caso por defecto tenemos que para temperatura se admite una distancia máxima de 30.000 metros, 15.000 metros para precipitación y 150 metros de diferencia en elevación.</p>
 <pre class="r"><code># Merge the station and cropping cycles according distances rules that are specified in the function,
 # the time period between station - cropping cycles is validated as well, station and crop_cycles which
 # don't
@@ -173,10 +266,69 @@ crop_cycles &lt;- crop_cycles[min(Stations_target$Min_Date) &lt; crop_cycles$Ini
 merg_Station &lt;- merge_Stations(Stations_target,crop_cycles,crop_cycle_Name= 'FID',
               Dtemp  = 30000, Drain  = 15000,
               Drhum  = 30000, Drads  = 30000,
-              DifElv = 150)</code></pre>
-</div>
-<div id="seleccionar-estaciones-que-hayan-cumplido-con-las-restricciones-definidas-por-los-lotes" class="section level2">
-<h2>Seleccionar estaciones que hayan cumplido con las restricciones definidas por los lotes</h2>
+              DifElv = 150)
+
+lapply(merg_Station,head)</code></pre>
+<pre><code>## $usefullStation
+##                Station ID_crop_cycle     dist crop_cycle_Latitude
+## 1     ChiapasTezuitlan             0 16091.07            15.16654
+## 2 ChiapasRanchoSanJosé             0 24650.23            15.16654
+## 3 ChiapasRanchoSanJosé             1 22654.96            15.16966
+## 4     ChiapasTezuitlan             2 25641.18            15.36830
+## 5     ChiapasTezuitlan             3 12929.15            15.18909
+## 6 ChiapasRanchoSanJosé             3 21984.61            15.18909
+##   crop_cycle_Longitude crop_cycle_Elevation crop_cycle_Ini_Date
+## 1            -92.81051                    0          2009-03-01
+## 2            -92.81051                    0          2009-03-01
+## 3            -92.79103                   16          2013-09-03
+## 4            -92.78351                   40          2011-04-18
+## 5            -92.77942                   10          2009-03-01
+## 6            -92.77942                   10          2009-03-01
+##   crop_cycle_End_Date Stat_Latitude Stat_Longitude Stat_Elevation Stat_P
+## 1          2009-06-30      15.16953      -92.66081             16      1
+## 2          2009-06-30      15.12906      -92.58442             14      1
+## 3          2014-01-02      15.12906      -92.58442             14      1
+## 4          2011-08-17      15.16953      -92.66081             16      1
+## 5          2009-06-30      15.16953      -92.66081             16      1
+## 6          2009-06-30      15.12906      -92.58442             14      1
+##   Stat_RH Stat_SR Stat_TM Stat_TX Stat_Ini_Date_P Stat_End_Date_P
+## 1       1       1       1       1      2009-03-01      2012-10-09
+## 2       1       1       1       1      2008-05-09      2015-09-20
+## 3       1       1       1       1      2008-05-09      2015-09-20
+## 4       1       1       1       1      2009-03-01      2012-10-09
+## 5       1       1       1       1      2009-03-01      2012-10-09
+## 6       1       1       1       1      2008-05-09      2015-09-20
+##   Stat_Ini_Date_RH Stat_End_Date_RH Stat_Ini_Date_TM Stat_End_Date_TM
+## 1       2009-03-01       2012-10-09       2009-03-01       2012-10-09
+## 2       2008-05-09       2015-09-20       2008-05-09       2015-09-20
+## 3       2008-05-09       2015-09-20       2008-05-09       2015-09-20
+## 4       2009-03-01       2012-10-09       2009-03-01       2012-10-09
+## 5       2009-03-01       2012-10-09       2009-03-01       2012-10-09
+## 6       2008-05-09       2015-09-20       2008-05-09       2015-09-20
+##   Stat_Ini_Date_TX Stat_End_Date_TX Stat_Ini_Date_SR Stat_End_Date_SR
+## 1       2009-03-01       2012-10-09       2009-03-01       2012-10-09
+## 2       2008-05-09       2015-09-20       2008-05-09       2015-09-20
+## 3       2008-05-09       2015-09-20       2008-05-09       2015-09-20
+## 4       2009-03-01       2012-10-09       2009-03-01       2012-10-09
+## 5       2009-03-01       2012-10-09       2009-03-01       2012-10-09
+## 6       2008-05-09       2015-09-20       2008-05-09       2015-09-20
+##   Stat_Min_Date Stat_Max_Date difElevation   UsefullData
+## 1    2009-03-01    2012-10-09           16   TX,TM,SR,RH
+## 2    2008-05-09    2015-09-20           14   TX,TM,SR,RH
+## 3    2008-05-09    2015-09-20            2   TX,TM,SR,RH
+## 4    2009-03-01    2012-10-09           24   TX,TM,SR,RH
+## 5    2009-03-01    2012-10-09            6 TX,TM,P,SR,RH
+## 6    2008-05-09    2015-09-20            4   TX,TM,SR,RH
+## 
+## $StationsList
+##             Station Stat_Elevation Total_crop_cycles_coverage
+## 1   Chiapas5deMarzo             10                         26
+## 2   ChiapasAgroipsa             59                          6
+## 3 ChiapasAlpujarras            998                         18
+## 4    ChiapasArgelia              4                         18
+## 5    ChiapasArgovia            712                         17
+## 6  ChiapasAustralia            601                          5</code></pre>
+<p>Existe la posibilidad que posterior al paso anterior, aún algunos eventos de cultivo no puedan ser cubiertos por las estaciones que están disponibles para la información climática, esto debido a que no cumplen los criterios establecidos, es decir están muy lejos o tienen una diferencia de altura muy grande, por tal razón estos eventos de cultivo son removidos de la base de datos de <code>crop_cycles</code>.</p>
 <pre class="r"><code># Extract the usefullStation list
 
 usefullStation &lt;- merg_Station$usefullStation
@@ -187,25 +339,85 @@ crop_cycles &lt;- crop_cycles[crop_cycles$FID %in% usefullStation$ID_crop_cycle,
 </div>
 <div id="identificar-por-variable-la-estacion-que-mejor-represente-la-informacion-climatica." class="section level2">
 <h2>Identificar por variable, la estación que mejor represente la información climática.</h2>
+<p>La función <code>crop_cycle_vars_station_assignation</code>, está diseñada para definir cuál es la estación que mejor representa a cada variable que va a ser asignada a un ciclo de cultivo, para ello elegirá la estación con menor distancia, menor diferencia de altura y menor cantidad de datos perdidos en dicho periodo.</p>
 <pre class="r"><code># Assigning each variable for each station
 
 crop_cycle_vars_station_assignation &lt;- assing_var_station(crop_cycles,usefullStation)
 
-# Assigning daily weather information for each event variable
+head(crop_cycle_vars_station_assignation)</code></pre>
+<pre><code>##   crop_cycle Variable              Station   Ini_Date   End_Date
+## 1          0       SR     ChiapasTezuitlan 2009-03-01 2009-06-30
+## 2          0        P     ChiapasTezuitlan 2009-03-01 2009-06-30
+## 3          0       RH     ChiapasTezuitlan 2009-03-01 2009-06-30
+## 4          0       TX ChiapasRanchoSanJosé 2009-03-01 2009-06-30
+## 5          0       TM ChiapasRanchoSanJosé 2009-03-01 2009-06-30
+## 6          1       SR ChiapasRanchoSanJosé 2013-09-03 2014-01-02</code></pre>
+<p>La figura a continuación muestra la distribución de estaciones (triángulos) y ciclos de cultivo (círculos), de acuerdo a la asignación obtenida en temperatura máxima representada por el mismo color.</p>
+<p><img src="data:image/png;base64,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" width="672" /></p>
+<p>Por último se aplica la función <code>weather_assignation</code>, que permite traer los valores reales de las variables de las estaciones meteorológicas y agruparlas en un <code>data.frame</code> o matriz donde cada fila representa un día del ciclo. El objeto final es una lista que contiene la historia climática a nivel diario de cada ciclo de cultivo.</p>
+<pre class="r"><code># Assigning daily weather information for each event variable
 
-Final_weather_assign &lt;- weather_assignation(crop_cycle_vars_station_assignation,list_Stations_Process)</code></pre>
+Final_weather_assign &lt;- weather_assignation(crop_cycle_vars_station_assignation,list_Stations_Process)
+
+lapply(Final_weather_assign[1:3],head)</code></pre>
+<pre><code>## $`0`
+##         date     SR P    RH   TX   TM
+## 1 2009-03-01   0.00 0 71.42 25.6 19.0
+## 2 2009-03-02 581.80 0 59.02 34.9 15.7
+## 3 2009-03-03 540.56 0 70.62 33.8 14.8
+## 4 2009-03-04 545.25 0 72.96 32.4 14.3
+## 5 2009-03-05 540.59 0 60.32 33.7 14.7
+## 6 2009-03-06 531.51 0 70.03 34.3 13.9
+## 
+## $`1`
+##         date       SR     P       RH       TX        TM
+## 1 2013-09-03 198.5278 131.4 91.39035 32.50599 18.630246
+## 2 2013-09-04 424.0631  83.8 65.32661 32.18667  8.836046
+## 3 2013-09-05 477.8690 141.6 62.06322 29.62901 19.787441
+## 4 2013-09-06 417.2395 108.0 58.17717 32.60210  8.402100
+## 5 2013-09-07 437.2993  83.8 75.54668 31.82549 18.739802
+## 6 2013-09-08 401.3285 108.0 63.23239 32.31289 22.303101
+## 
+## $`2`
+##         date     SR   P    RH   TX   TM
+## 1 2011-04-18 327.22 0.0 80.64 32.8 23.3
+## 2 2011-04-19 291.50 0.0 79.32 32.7 22.2
+## 3 2011-04-20 387.24 0.0 76.67 32.9 22.9
+## 4 2011-04-21 319.98 0.0 81.65 31.5 21.5
+## 5 2011-04-22 491.10 0.2 76.32 33.8 22.5
+## 6 2011-04-23 494.18 0.0 69.69 35.2 20.5</code></pre>
+<p>El resultado que se obtiene en este paso sirve como insumo para realizar <a href="https://github.com/hdorado/CLUSTERING_PATRONES_CLIMA">clustering de eventos de clima</a> e <a href="https://github.com/hdorado/Indicadores-climaticos">indicadores climáticos</a>, los cuales hacen parte de otros análisis o pasos previos de análisis de Agricultura Específica por Sitio (AEPS).</p>
 </div>
 <div id="generar-indicadores-climaticos-por-cada-uno-de-los-ciclos-de-acuerdo-a-la-asignacion." class="section level2">
 <h2>Generar indicadores climáticos por cada uno de los ciclos de acuerdo a la asignación.</h2>
+<p>Después de obtener las listas procedemos a calcular indicadores climáticos que sirvan como variables en análisis posteriores, para ello utilizamos la función <code>weather_indicators</code>, no obstante para agregar más indicadores y ver con mayor profundidad como trabaja esta función se sugiere explorar el repositorio de <a href="https://github.com/hdorado/Indicadores-climaticos">indicadores climáticos</a>.</p>
 <pre class="r"><code># Generating weather indicators
 
-Final_indicators &lt;- weather_indicators(Final_weather_assign)</code></pre>
+Final_indicators &lt;- weather_indicators(Final_weather_assign)
+head(Final_indicators)</code></pre>
+<pre><code>##    crop_cycle   TX_Avg   TM_Avg    T_Avg    DR_Avg       SR  TX_34_Fq
+## 0           0 32.89204 20.40739 26.64971 12.484651 49559.56 0.4344262
+## 1           1 32.93010 21.14670 27.03840 11.783407 48158.53 0.1885246
+## 2           2 33.43034 21.88626 27.65830 11.544079 45298.89 0.3852459
+## 3           3 32.89204 20.40739 26.64971 12.484651 49559.56 0.4344262
+## 11         11 29.14326 19.85129 24.49727  9.291972 45682.51 0.0000000
+## 12         12 29.08355 18.69974 23.89164 10.383809 43276.45 0.0000000
+##      P_Ac   P_10_Fq   TM_15_Fq   RH_Avg    RH_sd
+## 0   725.0 0.1639344 0.04098361 77.19346 9.358854
+## 1  2860.8 0.3196721 0.01639344 85.00486 7.617765
+## 2  1221.4 0.2786885 0.00000000 84.16486 5.952203
+## 3   725.0 0.1639344 0.04098361 77.19346 9.358854
+## 11 3348.8 0.5163934 0.00000000 86.94393 3.908390
+## 12 2549.8 0.5327869 0.00000000 87.62785 4.525919</code></pre>
 </div>
-<div id="almacenar-resultados" class="section level1">
-<h1>Almacenar resultados</h1>
+<div id="almacenar-resultados" class="section level2">
+<h2>Almacenar resultados</h2>
+<p>Finalmente almancenamos los resultados del procesamiento, todos los archivos son relevantes para consultas posteriores o seguir procesos de análisis AEPS.</p>
 <pre class="r"><code># Files to save
 
 save( Final_weather_assign , file=here::here(&quot;RESULTS&quot;,&quot;Final_weather_assign.RData&quot;))
+
+write.csv(crop_cycle_vars_station_assignation,here::here(&quot;RESULTS&quot;,&quot;crop_cycle_vars_station_assignation.csv&quot;),row.names = F)
 
 write.csv(Final_indicators,here::here(&quot;RESULTS&quot;,&quot;Final_indicators.csv&quot;),row.names = F)</code></pre>
 <p>(C) <em>2018, Grupo Big Data y Agricultura Específica por Sitio, Centro Internacional de Agricultura Trópical</em></p>
