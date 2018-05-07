@@ -1,6 +1,6 @@
 # Vinculación de variables climáticas a ciclos de cultivo
 
-El presente proyecto desarrollado en Rproject tiene el propósito de describir el proceso realizado en la vinculación de variables climáticas a ciclos de cultivo. Este es un paso importante en el análisis de agricultura específica por sitio, debido a que el clima desempeña un rol importante en la explicación de variación en rendimiento. Este proceso será de utilidad cuando se tiene sitios de interés georreferenciados, cuya información está dada en un periodo de tiempo y además se quiere evaluar la relación con estaciones meteorológicas dentro de la misma localidad que están georreferenciadas.
+El presente proyecto desarrollado en `Rproject` tiene el propósito de describir el proceso realizado para el procesamiento de variables climáticas en ciclos de cultivo, donde la información fuente son estaciones meteorológicas. Este es un paso importante en el análisis de agricultura específica por sitio, debido a que el clima desempeña un rol importante en la explicación de la variación en rendimiento. Los pasos descritos serán de utilidad cuando se tiene sitios de interés georreferenciados, cuya información está dada en un periodo de tiempo y además se quiere evaluar la relación con estaciones meteorológicas dentro de la misma localidad que están georreferenciadas.
 
 Dentro de la carpeta scripts encontrará los dos siguientes archivos:
 
