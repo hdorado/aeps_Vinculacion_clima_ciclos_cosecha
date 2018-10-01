@@ -57,15 +57,15 @@ distances_Rules <- function(dist_Stat_crop_cycles,Dtemp  = 30000,Drain  = 15000,
   
   # Reglas
   
-  tmaxRule <- dist_Stat_crop_cycles$Stat_TX==1 & dist_Stat_crop_cycles$difElevation   <=  DifElv & dist_Stat_crop_cycles$dist < Dtemp
+  tmaxRule <- dist_Stat_crop_cycles$Stat_TX==1 & (dist_Stat_crop_cycles$difElevation   <=  DifElv & dist_Stat_crop_cycles$dist < Dtemp)
   
-  tminRule <- dist_Stat_crop_cycles$Stat_TM==1 & dist_Stat_crop_cycles$difElevation   <= DifElv & dist_Stat_crop_cycles$dist < Dtemp
+  tminRule <- dist_Stat_crop_cycles$Stat_TM==1 & (dist_Stat_crop_cycles$difElevation   <= DifElv & dist_Stat_crop_cycles$dist < Dtemp)
   
-  rainRule <- dist_Stat_crop_cycles$dist < Drain & dist_Stat_crop_cycles$Stat_P==1
+  rainRule <- dist_Stat_crop_cycles$dist < Drain & (dist_Stat_crop_cycles$Stat_P==1) & (dist_Stat_crop_cycles$difElevation <= 500 )
   
-  esolRule <- dist_Stat_crop_cycles$dist < Drads & (dist_Stat_crop_cycles$Stat_SR==1)
+  esolRule <- dist_Stat_crop_cycles$dist < Drads & (dist_Stat_crop_cycles$Stat_SR==1) & (dist_Stat_crop_cycles$difElevation <= 500 )
   
-  rhumRule <- dist_Stat_crop_cycles$dist < Drhum & (dist_Stat_crop_cycles$Stat_RH==1) 
+  rhumRule <- dist_Stat_crop_cycles$dist < Drhum & (dist_Stat_crop_cycles$Stat_RH==1) & (dist_Stat_crop_cycles$difElevation <= 500 )
   
   # Variable con disponibilidad de datos
   
@@ -110,26 +110,28 @@ distances_Rules <- function(dist_Stat_crop_cycles,Dtemp  = 30000,Drain  = 15000,
 }  
 
 merge_Stations <- function(Stations_target,crop_cycles,crop_cycle_Name= 'FID',Dtemp  = 30000,Drain  = 15000,
-                          Drhum  = 30000, Drads  = 30000,DifElv = 150){
+                           Drhum  = 30000, Drads  = 30000,DifElv = 150){
   
   dist_Stat_crop_cycles <- compute_Distances(Stations_target,crop_cycles,crop_cycle_Name= 'FID')
-  
+  #save(dist_Stat_crop_cycles,file='dist_Stat_crop_cycles.RData')
   dist_Stat_crop_cycles <- dist_Stat_crop_cycles[dist_Stat_crop_cycles$crop_cycle_Ini_Date >= dist_Stat_crop_cycles$Stat_Min_Date & dist_Stat_crop_cycles$crop_cycle_End_Date <=  dist_Stat_crop_cycles$Stat_Max_Date,]
   
-  distances_Rules(dist_Stat_crop_cycles,Dtemp  = Dtemp,Drain  = Drain,
+  dist_Stat_crop_cycles <- dist_Stat_crop_cycles[complete.cases(dist_Stat_crop_cycles),]
+  
+  distances_Rules(dist_Stat_crop_cycles = dist_Stat_crop_cycles,Dtemp  = Dtemp,Drain  = Drain,
                   Drhum  = Drhum, Drads  = Drads,DifElv = DifElv)
-
+  
 }
 
 
 
-assing_var_station <- function(crop_cycles,usefullStation){
+assing_var_station <- function(crop_cycles,usefullStation,list_Stations_Unprocess){
   
   IQ_crop_cycle_Station <-
     do.call(rbind,
             lapply( seq(nrow(crop_cycles)) ,function(i){
               
-              # cat(i,'- ')
+              cat(i,'- ')
               
               crop_cycle <- crop_cycles[i,]
               
@@ -151,17 +153,17 @@ assing_var_station <- function(crop_cycles,usefullStation){
               QI_Final <-
                 do.call(rbind,
                         lapply( seq(length(stationsAsociated)),function(stat){
-                          
+                          cat(stat,'-')
                           stat_crop_cycle <- subSet[stat,]
                           
                           station <- stationsAsociated[stat]
                           
                           namStatUnprocess <- names(list_Stations_Unprocess)
                           
-                          Stat_Unprocess <- list_Stations_Unprocess[grep(station,namStatUnprocess)] # Estacion fuente no procesada
+                          Stat_Unprocess <- list_Stations_Unprocess[grep(station,namStatUnprocess,fixed = T)] # Estacion fuente no procesada
                           
-                          varsInters <- do.call(rbind,strsplit(names(Stat_Unprocess),'_'))[,2]
-                          
+                          #varsInters <- do.call(rbind,strsplit(names(Stat_Unprocess),'_'))[,2] 
+                          varsInters <- unlist(strsplit(stat_crop_cycle$UsefullData,','))
                           
                           
                           QI <- data.frame(QI_SR=NA,QI_P=NA,QI_RH=NA,QI_TX=NA,QI_TM=NA)
@@ -210,6 +212,8 @@ assing_var_station <- function(crop_cycles,usefullStation){
   IQ_crop_cycle_Station_split <- split(IQ_crop_cycle_Station,IQ_crop_cycle_Station$FID) # 
   
   do.call(rbind,lapply(seq(length(IQ_crop_cycle_Station_split)),function(z){
+    cat(z,"-")
+    
     crop_cycle_stat <- IQ_crop_cycle_Station_split[[z]]
     
     nam_crop_cycle_stat <- names(crop_cycle_stat)
@@ -219,15 +223,17 @@ assing_var_station <- function(crop_cycles,usefullStation){
     vars <- do.call(rbind,strsplit(nam_crop_cycle_stat[IQ_VARS],'_'))[,2]
     
     Station = crop_cycle_stat$Station[ sapply( crop_cycle_stat[,IQ_VARS],
-                                          function(w){
-                                            if(sum(is.na(w)==nrow(crop_cycle_stat))){
-                                              NA
-                                            }else{which.min(w)}
-                                          })]
+                                               function(w){
+                                                 if(sum(is.na(w))==nrow(crop_cycle_stat)){
+                                                   NA
+                                                 }else{which.min(w)}
+                                               })]
     
     
-    data.frame( crop_cycle =  unique(crop_cycle_stat$FID) , Variable = vars,Station = Station,
-                Ini_Date=crop_cycle_stat$Ini_Date[1],End_Date=crop_cycle_stat$End_Date[1])
+    df <- data.frame( crop_cycle =  unique(crop_cycle_stat$FID) , Variable = vars,Station = Station,
+                      Ini_Date=crop_cycle_stat$Ini_Date[1],End_Date=crop_cycle_stat$End_Date[1])
+    
+    df[complete.cases(df),]
   }))
 }
 
