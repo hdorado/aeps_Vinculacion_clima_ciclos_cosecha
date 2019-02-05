@@ -131,7 +131,7 @@ assing_var_station <- function(crop_cycles,usefullStation,list_Stations_Unproces
     do.call(rbind,
             lapply( seq(nrow(crop_cycles)) ,function(i){
               
-              cat(i,'- ')
+              # print(paste0(i,'-'))
               
               crop_cycle <- crop_cycles[i,]
               
@@ -153,7 +153,7 @@ assing_var_station <- function(crop_cycles,usefullStation,list_Stations_Unproces
               QI_Final <-
                 do.call(rbind,
                         lapply( seq(length(stationsAsociated)),function(stat){
-                          cat(stat,'-')
+                          # cat(stat,'-')
                           stat_crop_cycle <- subSet[stat,]
                           
                           station <- stationsAsociated[stat]
@@ -212,7 +212,7 @@ assing_var_station <- function(crop_cycles,usefullStation,list_Stations_Unproces
   IQ_crop_cycle_Station_split <- split(IQ_crop_cycle_Station,IQ_crop_cycle_Station$FID) # 
   
   do.call(rbind,lapply(seq(length(IQ_crop_cycle_Station_split)),function(z){
-    cat(z,"-")
+    # cat(z,"-")
     
     crop_cycle_stat <- IQ_crop_cycle_Station_split[[z]]
     
@@ -272,7 +272,8 @@ weather_assignation <- function(assignation = crop_cycle_vars_station_assignatio
 }
 
 
-weather_indicators <- function( Final_assignation ,Indicadores  = c("mean(TX)","mean(TM)","mean((TX+TM)/2)",
+weather_indicators <- function( Final_assignation,vars = c('TX','TM','SR','RH','P'),
+                                Indicadores  = c("mean(TX)","mean(TM)","mean((TX+TM)/2)",
                                                                     "mean(TX-TM)","sum(SR)","sum(TX>34)/length(TX)",
                                                                     "sum(P)","sum(P > 10)/length(P)",
                                                                     "sum(TM<15)/length(TM)","mean(RH)","sd(RH)" ),
@@ -281,6 +282,18 @@ weather_indicators <- function( Final_assignation ,Indicadores  = c("mean(TX)","
                                            "SR","TX_34_Fq","P_Ac","P_10_Fq",
                                            "TM_15_Fq","RH_Avg","RH_sd" )){
   
+Final_assignation <- lapply( Final_assignation,function(w){
+  
+  novar <- vars[!(vars %in% names(w))]
+  
+  if(length(novar)>0){
+    segme <- as.data.frame(matrix(NA,nrow =nrow(w) ,ncol = length(novar)))
+    names(segme) <- novar
+     w <- cbind(w,segme)
+  }
+  w
+ }
+)
   weather_indicator <-
     as.data.frame(
       t(

@@ -54,7 +54,7 @@ crop_cycles <- crop_cycles[crop_cycles$FID %in% usefullStation$ID_crop_cycle,]
 
 # Assigning each variable for each station
 
-crop_cycle_vars_station_assignation <- assing_var_station(crop_cycles,usefullStation)
+crop_cycle_vars_station_assignation <- assing_var_station(crop_cycles,usefullStation,list_Stations_Unprocess)
 
 # Assigning daily weather information for each event variable
 
